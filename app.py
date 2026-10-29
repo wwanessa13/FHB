@@ -1,9 +1,20 @@
+import streamlit as st
+
+st.markdown(
+    """
+    <style>
+    [data-testid="stFooter"] {
+        display: none;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
 from io import BytesIO
 from pathlib import Path
-
 import cv2
 import numpy as np
-import streamlit as st
 from PIL import Image
 from rembg import remove
 from ultralytics import YOLO
