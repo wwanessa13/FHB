@@ -1,0 +1,7 @@
+streamlit
+ultralytics
+rembg
+Pillow
+numpy<2.3
+opencv-python-headless==4.11.0.86
+onnxruntime
