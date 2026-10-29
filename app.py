@@ -3,8 +3,10 @@ import streamlit as st
 st.markdown(
     """
     <style>
-    [data-testid="stFooter"] {
-        display: none;
+    [data-testid="stViewerBadge"],
+    [class*="viewerBadge"],
+    [class*="ViewerBadge"] {
+        display: none !important;
     }
     </style>
     """,
