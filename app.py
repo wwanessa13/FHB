@@ -110,7 +110,9 @@ with st.sidebar:
             format="%.2f",
             help=(
                 "Confiança mínima para o modelo identificar "
-                "uma região como giberela."
+                "uma área com giberela. Uma confiança menor "
+                "pode detectar mais regiões, mas também pode "
+                "aumentar os falsos positivos."
             )
         )
 
@@ -119,8 +121,10 @@ with st.sidebar:
             options=[320, 640, 800, 960, 1024],
             value=800,
             help=(
-                "Resoluções maiores podem preservar detalhes, "
-                "mas aumentam o custo computacional."
+                "Define a resolução para a qual a imagem é "
+                "redimensionada antes de ser processada pelo modelo."
+                "Resoluções maiores podem preservar mais detalhes, "
+                "mas nem sempre garantem maior precisão."
             )
         )
 
