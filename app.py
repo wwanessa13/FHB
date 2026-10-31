@@ -209,26 +209,30 @@ def mascara_png(mascara):
 # ============================================================
 
 with st.sidebar:
-    st.header("Parâmetros")
+    with st.expander("⚙️ Configurações avançadas", expanded=False):
 
-    conf = st.slider(
-        "Confiança mínima",
-        min_value=0.05,
-        max_value=0.95,
-        value=0.30,
-        step=0.05
-    )
+        conf = st.slider(
+            "Confiança mínima",
+            min_value=0.05,
+            max_value=0.95,
+            value=0.30,
+            step=0.05,
+            format="%.2f",
+            help=(
+                "Define a confiança mínima para que o modelo "
+                "considere uma região como giberela."
+            )
+        )
 
-    imgsz = st.select_slider(
-        "Tamanho de inferência",
-        options=[320, 640, 800, 960, 1024],
-        value=640
-    )
-
-    st.caption(
-        "Uma confiança menor pode detectar mais regiões, "
-        "mas também pode aumentar os falsos positivos."
-    )
+        imgsz = st.select_slider(
+            "Tamanho de inferência",
+            options=[320, 640, 800, 960, 1024],
+            value=800,
+            help=(
+                "Resoluções maiores podem preservar mais detalhes, "
+                "mas aumentam o custo computacional."
+            )
+        )
 
 
 # ============================================================
@@ -258,18 +262,6 @@ if arquivo is not None:
         "<h3 style='text-align:center;'>Imagem enviada</h3>",
         unsafe_allow_html=True
     )
-
-    _, centro, _ = st.columns([1, 2, 1])
-
-    with centro:
-        st.image(
-            imagem_original,
-            caption=(
-                f"{imagem_original.width} × "
-                f"{imagem_original.height} pixels"
-            ),
-            width=250
-        )
 
     if st.button(
         "Remover fundo e calcular severidade",
@@ -394,21 +386,14 @@ if arquivo is not None:
                 st.image(
                     imagem_limpa,
                     caption="Espiga após remoção do fundo",
-                    width=300
+                    width=230
                 )
 
             with col2:
                 st.image(
                     imagem_overlay,
                     caption="Região identificada como doente",
-                    width=300
-                )
-
-            with st.expander("Ver máscara binária da doença"):
-                st.image(
-                    mascara,
-                    caption="Branco = pixels classificados como doentes",
-                    width=300
+                    width=230
                 )
 
             # -----------------------------------------------
