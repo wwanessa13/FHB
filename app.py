@@ -1,7 +1,6 @@
 
 import streamlit as st
 import numpy as np
-
 from io import BytesIO
 from pathlib import Path
 from PIL import Image
@@ -20,11 +19,7 @@ st.set_page_config(
 )
 
 MODEL_PATH = Path(__file__).parent / "best.pt"
-
 CLASS_ID_DOENCA = 0
-
-# Limiar de transparência para identificar a espiga
-LIMIAR_PLANTA = 10
 
 
 # ============================================================
@@ -44,6 +39,28 @@ st.markdown(
     /* Título principal */
     h1 {
         font-size: 36px !important;
+    }
+
+    /* Largura máxima e centralização da página */
+    .stMainBlockContainer {
+        max-width: 1100px !important;
+        width: 100% !important;
+        margin-left: auto !important;
+        margin-right: auto !important;
+        padding-left: 2rem !important;
+        padding-right: 2rem !important;
+    }
+
+    /* Ajuste para janelas estreitas */
+    @media (max-width: 700px) {
+        .stMainBlockContainer {
+            padding-left: 1rem !important;
+            padding-right: 1rem !important;
+        }
+
+        h1 {
+            font-size: 28px !important;
+        }
     }
 
     /* Centralizar imagens */
@@ -75,6 +92,53 @@ st.write(
 
 
 # ============================================================
+# CONFIGURAÇÕES AVANÇADAS
+# ============================================================
+
+with st.sidebar:
+    with st.expander(
+        "⚙️ Configurações avançadas",
+        expanded=False
+    ):
+
+        conf = st.slider(
+            "Confiança mínima",
+            min_value=0.05,
+            max_value=0.95,
+            value=0.30,
+            step=0.05,
+            format="%.2f",
+            help=(
+                "Confiança mínima para o modelo identificar "
+                "uma região como giberela."
+            )
+        )
+
+        imgsz = st.select_slider(
+            "Tamanho de inferência",
+            options=[320, 640, 800, 960, 1024],
+            value=800,
+            help=(
+                "Resoluções maiores podem preservar detalhes, "
+                "mas aumentam o custo computacional."
+            )
+        )
+
+        limiar_planta = st.slider(
+            "Limiar de remoção do fundo",
+            min_value=0,
+            max_value=255,
+            value=10,
+            step=1,
+            help=(
+                "Define o valor mínimo da transparência "
+                "para considerar um pixel como parte da espiga. "
+                "Valores maiores tornam a máscara mais restritiva."
+            )
+        )
+
+
+# ============================================================
 # CARREGAMENTO DO MODELO
 # ============================================================
 
@@ -87,7 +151,7 @@ def carregar_modelo(caminho):
 # REMOÇÃO DO FUNDO
 # ============================================================
 
-def remover_fundo(imagem_pil):
+def remover_fundo(imagem_pil, limiar_planta):
     resultado = remove(imagem_pil.convert("RGBA"))
 
     if isinstance(resultado, Image.Image):
@@ -96,9 +160,12 @@ def remover_fundo(imagem_pil):
         rgba = Image.open(BytesIO(resultado)).convert("RGBA")
 
     # Máscara da espiga baseada na transparência do rembg
-    alpha = np.asarray(rgba.getchannel("A"), dtype=np.uint8)
+    alpha = np.asarray(
+        rgba.getchannel("A"),
+        dtype=np.uint8
+    )
 
-    plant_mask = alpha > LIMIAR_PLANTA
+    plant_mask = alpha > limiar_planta
 
     # Compor a imagem sobre fundo preto
     fundo = Image.new(
@@ -108,7 +175,6 @@ def remover_fundo(imagem_pil):
     )
 
     fundo.alpha_composite(rgba)
-
     imagem_sem_fundo = fundo.convert("RGB")
 
     return imagem_sem_fundo, plant_mask
@@ -136,9 +202,7 @@ def segmentar(modelo, imagem, confianca, imgsz):
     )
 
     if resultado.masks is not None and resultado.boxes is not None:
-
         mascaras = resultado.masks.data.cpu().numpy()
-
         classes = (
             resultado.boxes.cls.cpu().numpy().astype(int)
         )
@@ -149,9 +213,8 @@ def segmentar(modelo, imagem, confianca, imgsz):
             if classe != CLASS_ID_DOENCA:
                 continue
 
-            # Garantir que a máscara tenha as dimensões da imagem
+            # Garantir dimensões iguais às da imagem original
             if mascara.shape != (altura, largura):
-
                 mascara_binaria = Image.fromarray(
                     (mascara >= 0.5).astype(np.uint8) * 255
                 )
@@ -161,10 +224,7 @@ def segmentar(modelo, imagem, confianca, imgsz):
                     Image.Resampling.NEAREST
                 )
 
-                mascara = (
-                    np.asarray(mascara_binaria) > 0
-                )
-
+                mascara = np.asarray(mascara_binaria) > 0
             else:
                 mascara = mascara >= 0.5
 
@@ -174,7 +234,7 @@ def segmentar(modelo, imagem, confianca, imgsz):
 
 
 # ============================================================
-# IMAGEM SOBREPOSTA
+# SOBREPOSIÇÃO DA REGIÃO DOENTE
 # ============================================================
 
 def overlay_doenca(imagem, mascara):
@@ -182,8 +242,10 @@ def overlay_doenca(imagem, mascara):
         imagem.convert("RGB")
     ).copy()
 
-    # Destacar a região doente em vermelho
-    vermelho = np.array([255, 0, 0], dtype=np.float32)
+    vermelho = np.array(
+        [255, 0, 0],
+        dtype=np.float32
+    )
 
     base[mascara] = (
         0.45 * vermelho
@@ -191,48 +253,6 @@ def overlay_doenca(imagem, mascara):
     ).astype(np.uint8)
 
     return Image.fromarray(base)
-
-
-# ============================================================
-# MÁSCARA VISUAL
-# ============================================================
-
-def mascara_png(mascara):
-    return Image.fromarray(
-        mascara.astype(np.uint8) * 255,
-        mode="L"
-    )
-
-
-# ============================================================
-# SIDEBAR
-# ============================================================
-
-with st.sidebar:
-    with st.expander("⚙️ Configurações avançadas", expanded=False):
-
-        conf = st.slider(
-            "Confiança mínima",
-            min_value=0.05,
-            max_value=0.95,
-            value=0.30,
-            step=0.05,
-            format="%.2f",
-            help=(
-                "Define a confiança mínima para que o modelo "
-                "considere uma região como giberela."
-            )
-        )
-
-        imgsz = st.select_slider(
-            "Tamanho de inferência",
-            options=[320, 640, 800, 960, 1024],
-            value=800,
-            help=(
-                "Resoluções maiores podem preservar mais detalhes, "
-                "mas aumentam o custo computacional."
-            )
-        )
 
 
 # ============================================================
@@ -258,11 +278,6 @@ if arquivo is not None:
         st.error("Não foi possível abrir a imagem enviada.")
         st.stop()
 
-    st.markdown(
-        "<h3 style='text-align:center;'>Imagem enviada</h3>",
-        unsafe_allow_html=True
-    )
-
     if st.button(
         "Remover fundo e calcular severidade",
         type="primary",
@@ -277,14 +292,14 @@ if arquivo is not None:
             st.stop()
 
         try:
-            # -----------------------------------------------
+            # ------------------------------------------------
             # 1. Remover fundo
-            # -----------------------------------------------
+            # ------------------------------------------------
 
             with st.spinner("Removendo o fundo da imagem..."):
-
                 imagem_sem_fundo, plant_mask = remover_fundo(
-                    imagem_original
+                    imagem_original,
+                    limiar_planta
                 )
 
             area_total = int(plant_mask.sum())
@@ -292,18 +307,18 @@ if arquivo is not None:
             if area_total == 0:
                 st.error(
                     "Nenhum pixel da espiga foi identificado. "
-                    "Tente enviar outra imagem."
+                    "Tente outra imagem ou ajuste o limiar "
+                    "nas configurações avançadas."
                 )
                 st.stop()
 
-            # -----------------------------------------------
+            # ------------------------------------------------
             # 2. Segmentar região doente
-            # -----------------------------------------------
+            # ------------------------------------------------
 
             with st.spinner(
                 "Identificando a região com giberela..."
             ):
-
                 modelo = carregar_modelo(MODEL_PATH)
 
                 disease_mask, resultado = segmentar(
@@ -318,9 +333,9 @@ if arquivo is not None:
 
             area_doente = int(disease_mask.sum())
 
-            # -----------------------------------------------
+            # ------------------------------------------------
             # 3. Calcular severidade
-            # -----------------------------------------------
+            # ------------------------------------------------
 
             severidade = (
                 100.0 * area_doente / area_total
@@ -342,14 +357,11 @@ if arquivo is not None:
                 disease_mask
             )
 
-            mascara = mascara_png(disease_mask)
-
-            # -----------------------------------------------
+            # ------------------------------------------------
             # 4. Apresentar resultados
-            # -----------------------------------------------
+            # ------------------------------------------------
 
             st.success("Processamento concluído!")
-
             st.subheader("Resultado")
 
             col_a, col_b, col_c = st.columns(3)
@@ -371,14 +383,20 @@ if arquivo is not None:
                 + " pixels"
             )
 
+            n_instancias = (
+                len(resultado.boxes)
+                if resultado.boxes is not None
+                else 0
+            )
+
             st.caption(
                 f"Confiança: {conf:.2f} | "
                 f"imgsz: {imgsz} | "
-                f"Instâncias detectadas: "
-                f"{len(resultado.boxes) if resultado.boxes is not None else 0}"
+                f"Limiar do fundo: {limiar_planta} | "
+                f"Instâncias detectadas: {n_instancias}"
             )
 
-            st.markdown("### Visualização das imagens")
+            st.markdown("### Visualização dos resultados")
 
             col1, col2 = st.columns(2)
 
@@ -396,9 +414,9 @@ if arquivo is not None:
                     width=230
                 )
 
-            # -----------------------------------------------
+            # ------------------------------------------------
             # 5. Relatório para download
-            # -----------------------------------------------
+            # ------------------------------------------------
 
             relatorio = (
                 "RELATÓRIO DE SEVERIDADE DE GIBERELA\n"
@@ -412,6 +430,7 @@ if arquivo is not None:
                 f"Severidade estimada: {severidade:.4f}%\n"
                 f"Confiança mínima: {conf:.2f}\n"
                 f"Tamanho de inferência: {imgsz}\n"
+                f"Limiar de remoção do fundo: {limiar_planta}\n"
             )
 
             st.download_button(
